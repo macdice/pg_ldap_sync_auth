@@ -13,8 +13,8 @@
 # change sequence numbers from the LDAP server.  And be a proper PAM module.
 # And support Kerberos etc.  And support StartTLS.  And client certificates.
 # And a configuration file.  And a review of filter escaping hygiene etc.
-# And logging?  And better error reporting than just bombing out.  And
-# time-outs.
+# And logging?  And report auth failure differently from errors.  And have
+# time-outs. ...
 #
 # To test from the command line:
 #
@@ -30,8 +30,8 @@
 #
 #   host all all all pam pamservice=postgresql
 #
-# Only works on Linux for now (because expose_authtok is a Linux PAM
-# extension, so you need to write some C on other OSes...)
+# Works on Linux pam_exec.so, or FreeBSD pam_exec.so with a patch:
+# https://reviews.freebsd.org/D16171
 #   
 # Thomas Munro
 
@@ -70,10 +70,6 @@ def auto_create_user(cursor, username):
   else:
     # we need to create the user now
     cursor.execute("CREATE USER %s" % (quote_ident(username, cursor)))
-    cursor.execute("""SELECT usesysid
-                        FROM pg_user
-                       WHERE usename = %s""",
-                   [username])
     return True
 
 def auto_grant_revoke_roles(cursor, l, user_dn, username):
@@ -154,11 +150,10 @@ def authenticate(username, password):
 if __name__ == "__main__":
   # when invoked by pam_exec.so we take the username from an env
   # variable, but otherwise we'll take it from the command line for testing;
-  # the password is read from stdin, so you can test like this:
+  # the password is read from stdin
   if "PAM_USER" in os.environ:
     username = os.environ["PAM_USER"]
   else:
     username = sys.argv[1]
-  #password = sys.stdin.read()
-  password = "password"
+  password = sys.stdin.read()
   authenticate(username, password)
